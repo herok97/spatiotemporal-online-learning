@@ -1,6 +1,6 @@
 # Spatiotemporal video coding with online learning
 
-### Based on:
+### Based on sites for implemenatation:
 CompressAI (_compress-ay_) is a PyTorch library and evaluation platform for
 end-to-end compression research.
 https://github.com/InterDigitalInc/CompressAI
@@ -9,9 +9,12 @@ liujiaheng's implementation of the Balle's paper
 https://github.com/liujiaheng/compression
 
 
-## Installation
+### Based on this papers
+[2018, Minnen, Joint Autoregressive and Hierarchical Priors for Learned Image Compression, NIPS](https://arxiv.org/abs/1809.02736)
 
-## Documentation
+[2019, Samsung, Variable Rate Deep Image Compression With a Conditional Autoencoder, ICCV](https://openaccess.thecvf.com/content_ICCV_2019/papers/Choi_Variable_Rate_Deep_Image_Compression_With_a_Conditional_Autoencoder_ICCV_2019_paper.pdf)
+
+[2021, Zhenhong_Spatiotemporal Entropy Model Is All You Need For Learned Video Compression, arxiv](https://arxiv.org/abs/2104.06083)
 
 ## Usage
 
