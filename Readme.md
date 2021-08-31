@@ -9,7 +9,7 @@ liujiaheng's implementation of the Balle's paper
 https://github.com/liujiaheng/compression
 
 
-### Based on this papers
+### Based on these papers
 [2018, Minnen, Joint Autoregressive and Hierarchical Priors for Learned Image Compression, NIPS](https://arxiv.org/abs/1809.02736)
 
 [2019, Samsung, Variable Rate Deep Image Compression With a Conditional Autoencoder, ICCV](https://openaccess.thecvf.com/content_ICCV_2019/papers/Choi_Variable_Rate_Deep_Image_Compression_With_a_Conditional_Autoencoder_ICCV_2019_paper.pdf)
