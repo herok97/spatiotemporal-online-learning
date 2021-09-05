@@ -1,6 +1,12 @@
+import torch
+import torch.nn as nn
+
+from compressai.entropy_models import EntropyBottleneck, GaussianConditional
+from compressai.layers import GDN
+from compressai.models.priors import ScaleHyperprior
+from compressai.models.utils import *
 from basics import *
 import math
-
 class mySequential(nn.Sequential):
     def forward(self, *input):
         input, lmbda = input
@@ -62,18 +68,16 @@ class ImageCompressor_Minnen_CConv(nn.Module):
         )
 
     def forward(self, input_image, lmbda):
-        quant_noise_feature = torch.zeros(input_image.size(0), self.M, input_image.size(2) // 16,
-                                          input_image.size(3) // 16).cuda()
-        quant_noise_z = torch.zeros(input_image.size(0), self.N, input_image.size(2) // 64,
-                                    input_image.size(3) // 64).cuda()
-        quant_noise_feature = torch.nn.init.uniform_(torch.zeros_like(quant_noise_feature), -0.5, 0.5)
-        quant_noise_z = torch.nn.init.uniform_(torch.zeros_like(quant_noise_z), -0.5, 0.5)
 
         y = self.Encoder(input_image, lmbda)
         z = self.priorEncoder(y, lmbda)
         batch_size = y.size()[0]
 
         if self.training:
+            quant_noise_feature = torch.zeros_like(y).cuda()
+            quant_noise_feature = torch.nn.init.uniform_(torch.zeros_like(quant_noise_feature), -0.5, 0.5)
+            quant_noise_z = torch.zeros_like(z).cuda()
+            quant_noise_z = torch.nn.init.uniform_(torch.zeros_like(quant_noise_z), -0.5, 0.5)
             y_hat = y + quant_noise_feature
             z_hat = z + quant_noise_z
         else:

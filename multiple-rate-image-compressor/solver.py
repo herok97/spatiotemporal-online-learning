@@ -1,10 +1,21 @@
+import math
 import random
+
 import time
+from random import choice, choices
+
+import cv2
+import cv2 as cv
 import numpy as np
-from tqdm import tqdm
-from ImageCompressor_Minnen_CConv import *
+import torch
+from tqdm import tqdm, trange
+from ImageCompressor_Minnen_CConv import ImageCompressor_Minnen_CConv
+import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision import transforms
+from compressai.datasets import ImageFolder
+from basics import *
 # 텐서보드 추가
 from tensorboardX import SummaryWriter
 
@@ -17,7 +28,7 @@ def clip_gradient(optimizer, grad_clip):
 
 class Solver():
     def __init__(self, config, isTrain=True):
-        self.imageCompressor = ImageCompressor_Minnen_CConv(256, 384).cuda()
+        self.imageCompressor = ImageCompressor_Minnen_CConv(192, 320).cuda()
         self.config = config
         self.global_step = 0
         self.isTrain = isTrain
@@ -71,9 +82,8 @@ class Solver():
         self.fix_seed(self.config.seed)
         parameters = self.imageCompressor.parameters()
         self.optimizer = optim.Adam(parameters, lr=self.config.lr)
-        self.scheduler = optim.lr_scheduler.StepLR(optimizer=self.optimizer, step_size=self.config.decay_step,
-                                                    gamma=self.config.lr_decay)
-
+        self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[1000000, 1100000, 1150000, 1200000], gamma=0.5)
+        # self.scheduler = optim.lr_scheduler.MultiStepLR(self.optimizer, milestones=[800000, 1050000, 1150000, 1200000], gamma=0.5)
 
         if self.config.pre_train:
             print(f'load pre-trained model {self.config.save_model_dir}')
@@ -82,11 +92,10 @@ class Solver():
                                      [self.optimizer],
                                      [self.scheduler],
                                      self.config.save_model_dir)
-                ######################################## 꼭 지워야할 콛# ##############
-                # self.optimizer.param_groups[0]['lr'] = 0.000001
             else:
                 self.load_model(self.imageCompressor, self.config.save_model_dir)
-
+        # self.scheduler.milestones=[1600000, 2100000, 2300000, 2400000]
+        self.optimizer.param_groups[0]['lr'] = 0.00003 * 0.5
         # 데이터셋 로드
         self.load_dataset()
 
@@ -115,41 +124,43 @@ class Solver():
                 if self.config.total_global_step < self.global_step:
                     exit(0)
 
-                for lm in range(5):
-                    # forward network
-                    original_img = img.cuda()
-                    # lambda 값은 순차적으로 접근 (균일하게 하기 위해서)
-                    lmbda = self.config.lmbda[lm % 5]
-                    lmbda_one_hot = self.one_hot(lmbda)  # for multiple bitrate
-
-                    x_hat, y_hat, mse_loss, bpp_feature, bpp_z, bpp = self.imageCompressor(original_img,
-                                                                                           lmbda_one_hot)
-                    mse_loss, bpp_feature, bpp_z, bpp = \
-                        torch.mean(mse_loss), torch.mean(bpp_feature), torch.mean(bpp_z), torch.mean(bpp)
-                    rd_loss = mse_loss * lmbda + bpp
-                    if lm == 0:
-                        total_loss = rd_loss
-                    else:
-                        total_loss += rd_loss
-
-                    psnr = 10 * (torch.log(1 * 1 / mse_loss) / np.log(10))
-
-                    cum_bpp[str(lmbda)].append(np.float(bpp.detach()))
-                    cum_loss[str(lmbda)].append(np.float(rd_loss.detach()))
-                    cum_psnr[str(lmbda)].append(np.float(psnr.detach()))
-                # # forward network
-                # original_img = img.cuda()
-                # # lambda 값은 순차적으로 접근 (균일하게 하기 위해서)
-                # lmbda = self.config.lmbda[i % 5]
-                # lmbda_one_hot = self.one_hot(lmbda)  # for multiple bitrate
+                # for lm in range(5):
+                #     # forward network
+                #     original_img = img.cuda()
+                #     # lambda 값은 순차적으로 접근 (균일하게 하기 위해서)
+                #     lmbda = self.config.lmbda[lm % 5]
+                #     lmbda_one_hot = self.one_hot(lmbda)  # for multiple bitrate
                 #
-                # x_hat, y_hat, mse_loss, bpp_feature, bpp_z, bpp = self.imageCompressor(original_img,
-                #                                                                        lmbda_one_hot)
-                # mse_loss, bpp_feature, bpp_z, bpp = \
-                #     torch.mean(mse_loss), torch.mean(bpp_feature), torch.mean(bpp_z), torch.mean(bpp)
+                #     x_hat, y_hat, mse_loss, bpp_feature, bpp_z, bpp = self.imageCompressor(original_img,
+                #                                                                            lmbda_one_hot)
+                #     mse_loss, bpp_feature, bpp_z, bpp = \
+                #         torch.mean(mse_loss), torch.mean(bpp_feature), torch.mean(bpp_z), torch.mean(bpp)
+                #     rd_loss = mse_loss * lmbda + bpp
+                #     if lm == 0:
+                #         total_loss = rd_loss
+                #     else:
+                #         total_loss += rd_loss
                 #
-                # rd_loss = mse_loss * lmbda + bpp
-                rd_loss = torch.sum(total_loss)
+                #     psnr = 10 * (torch.log(1 * 1 / mse_loss) / np.log(10))
+                #
+                #     cum_bpp[str(lmbda)].append(np.float(bpp.detach()))
+                #     cum_loss[str(lmbda)].append(np.float(rd_loss.detach()))
+                #     cum_psnr[str(lmbda)].append(np.float(psnr.detach()))
+                # rd_loss = torch.sum(total_loss)
+
+                # forward network
+                original_img = img.cuda()
+                # lambda 값은 랜덤 값
+                lmbda = self.config.lmbda[random.randint(0, 8)]
+                lmbda_one_hot = self.one_hot(lmbda)  # for multiple bitrate
+
+                x_hat, y_hat, mse_loss, bpp_feature, bpp_z, bpp = self.imageCompressor(original_img,
+                                                                                       lmbda_one_hot)
+                mse_loss, bpp_feature, bpp_z, bpp = \
+                    torch.mean(mse_loss), torch.mean(bpp_feature), torch.mean(bpp_z), torch.mean(bpp)
+
+                rd_loss = mse_loss * lmbda + bpp
+
                 self.optimizer.zero_grad()
                 rd_loss.backward()
 
@@ -158,14 +169,14 @@ class Solver():
                 self.optimizer.step()
                 self.scheduler.step()
 
-                # psnr = 10 * (torch.log(1 * 1 / mse_loss) / np.log(10))
-                #
-                # cum_bpp[str(lmbda)].append(np.float(bpp.detach()))
-                # cum_loss[str(lmbda)].append(np.float(rd_loss.detach()))
-                # cum_psnr[str(lmbda)].append(np.float(psnr.detach()))
+                psnr = 10 * (torch.log(1 * 1 / mse_loss) / np.log(10))
+
+                cum_bpp[str(lmbda)].append(np.float(bpp.detach()))
+                cum_loss[str(lmbda)].append(np.float(rd_loss.detach()))
+                cum_psnr[str(lmbda)].append(np.float(psnr.detach()))
 
 
-                if self.global_step % 25 == 0:
+                if self.global_step % 50 == 0:
                     for i in self.config.lmbda:
                         cum_bpp[str(i)] = np.mean(cum_bpp[str(i)])
                         cum_loss[str(i)] = np.mean(cum_loss[str(i)])
